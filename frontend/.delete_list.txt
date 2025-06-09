@@ -1,0 +1,8 @@
+netlify.toml
+amplify.yml
+amplify/
+buildspec.yml
+buildspec_simple.yml
+frontend-build-new.zip
+frontend-build.zip
+__tests__/
