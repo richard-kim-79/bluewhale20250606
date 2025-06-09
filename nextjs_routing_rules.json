@@ -1,0 +1,22 @@
+[
+  {
+    "source": "/_next/static/<*>",
+    "target": "/_next/static/<*>",
+    "status": "200"
+  },
+  {
+    "source": "/_next/data/<*>",
+    "target": "/_next/data/<*>",
+    "status": "200"
+  },
+  {
+    "source": "/api/<*>",
+    "target": "/api/<*>",
+    "status": "200"
+  },
+  {
+    "source": "/<*>",
+    "target": "/index.html",
+    "status": "200"
+  }
+]

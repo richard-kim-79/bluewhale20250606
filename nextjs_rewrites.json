@@ -1,0 +1,17 @@
+[
+  {
+    "source": "/<*>",
+    "target": "/index.html",
+    "status": "404-200"
+  },
+  {
+    "source": "/_next/<*>",
+    "target": "/_next/<*>",
+    "status": "200"
+  },
+  {
+    "source": "/<*>",
+    "target": "/<*>",
+    "status": "200"
+  }
+]

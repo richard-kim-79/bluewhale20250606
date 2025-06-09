@@ -160,12 +160,94 @@ deploy_frontend() {
   BACKEND_URL=$(cat "$PROJECT_ROOT/.backend_url")
   if [ -z "$BACKEND_URL" ]; then
     print_error "백엔드 URL을 찾을 수 없습니다. 백엔드 배포를 먼저 실행하세요."
+    return 1
   fi
   
-  # amplify.yml 파일이 없으면 생성
-  if [ ! -f "amplify.yml" ]; then
-    cat > amplify.yml << EOF
-version: 1
+  # .env.local 파일 생성
+  cat > .env.local << EOF
+NEXT_PUBLIC_API_URL=$BACKEND_URL
+EOF
+  print_success ".env.local 파일이 생성되었습니다."
+  
+  # 루트 디렉토리에 있는 amplify 폴더 삭제 (중첩 Amplify 프로젝트 문제 방지)
+  if [ -d "$PROJECT_ROOT/amplify" ]; then
+    print_warning "루트 디렉토리에 amplify 폴더가 있습니다. 삭제 중..."
+    rm -rf "$PROJECT_ROOT/amplify"
+    print_success "루트 amplify 폴더가 삭제되었습니다."
+  fi
+  
+  # Next.js 앱 빌드
+  print_warning "Next.js 앱 빌드 중..."
+  npm run build --no-lint
+  
+  if [ $? -ne 0 ]; then
+    print_error "Next.js 앱 빌드에 실패했습니다."
+    return 1
+  fi
+  
+  print_success "Next.js 앱 빌드가 완료되었습니다."
+  
+  # 빌드 결과물 압축
+  print_warning "빌드 결과물 압축 중..."
+  cd "$FRONTEND_DIR"
+  ZIP_FILE="$PROJECT_ROOT/frontend-build.zip"
+  
+  # 기존 zip 파일 삭제
+  if [ -f "$ZIP_FILE" ]; then
+    rm "$ZIP_FILE"
+  fi
+  
+  # .next 폴더 압축
+  zip -r "$ZIP_FILE" .next
+  
+  if [ $? -ne 0 ]; then
+    print_error "빌드 결과물 압축에 실패했습니다."
+    return 1
+  fi
+  
+  print_success "빌드 결과물이 압축되었습니다: $ZIP_FILE"
+  
+  # AWS CLI를 사용하여 Amplify 앱 배포
+  print_warning "AWS CLI를 사용하여 Amplify 앱 배포 중..."
+  
+  # 새로운 Amplify 앱 생성 (기존 앱에 문제가 있는 경우)
+  AMPLIFY_APP_NAME="bluewhale-frontend-$(date +%Y%m%d%H%M%S)"
+  AMPLIFY_APP_RESPONSE=$(aws amplify create-app \
+    --name "$AMPLIFY_APP_NAME" \
+    --platform WEB \
+    --region "$REGION")
+  
+  AMPLIFY_APP_ID=$(echo "$AMPLIFY_APP_RESPONSE" | grep -o '"appId": "[^"]*"' | cut -d '"' -f4)
+  
+  if [ -z "$AMPLIFY_APP_ID" ]; then
+    print_error "Amplify 앱 생성에 실패했습니다."
+    return 1
+  fi
+  
+  print_success "새로운 Amplify 앱이 생성되었습니다. 앱 ID: $AMPLIFY_APP_ID"
+  
+  # 브랜치 생성
+  aws amplify create-branch \
+    --app-id "$AMPLIFY_APP_ID" \
+    --branch-name "main" \
+    --framework "NEXTJS" \
+    --stage "PRODUCTION" \
+    --region "$REGION"
+  
+  print_success "'main' 브랜치가 생성되었습니다."
+  
+  # 환경 변수 설정
+  aws amplify update-app \
+    --app-id "$AMPLIFY_APP_ID" \
+    --environment-variables "NEXT_PUBLIC_API_URL=$BACKEND_URL" \
+    --region "$REGION"
+  
+  print_success "환경 변수가 설정되었습니다."
+  
+  # Next.js SSR을 위한 빌드 스펙 설정
+  aws amplify update-app \
+    --app-id "$AMPLIFY_APP_ID" \
+    --build-spec "version: 1
 frontend:
   phases:
     preBuild:
@@ -173,62 +255,44 @@ frontend:
         - npm ci
     build:
       commands:
-        - NEXT_PUBLIC_API_URL=$BACKEND_URL npm run build
+        - npm run build
   artifacts:
-    baseDirectory: .next
+    baseDirectory: .
     files:
       - '**/*'
   cache:
     paths:
       - node_modules/**/*
-      - .next/cache/**/*
-EOF
-  fi
+  customHeaders:
+    - pattern: '**/*'
+      headers:
+        - key: 'Cache-Control'
+          value: 'public, max-age=0, must-revalidate'" \
+    --region "$REGION"
   
-  # .env.local 파일 생성
-  cat > .env.local << EOF
-NEXT_PUBLIC_API_URL=$BACKEND_URL
-EOF
+  print_success "빌드 스펙이 설정되었습니다."
   
-  # Amplify 프로젝트가 초기화되었는지 확인
-  if [ ! -d "amplify" ]; then
-    print_warning "Amplify 프로젝트가 초기화되지 않았습니다. 초기화 중..."
-    echo '{"projectName":"bluewhale-frontend","version":"3.0","frontend":"javascript","javascript":{"framework":"react","config":{"SourceDir":"src","DistributionDir":".next","BuildCommand":"npm run build","StartCommand":"npm run start"}},"providers":["awscloudformation"]}' > ./amplify-config.json
-    amplify init --app ./amplify-config.json
-  fi
+  # Next.js SSR을 위한 향상된 라우팅 규칙 설정
+  aws amplify update-app \
+    --app-id "$AMPLIFY_APP_ID" \
+    --custom-rules "[{\"source\":\"/_next/static/<*>\",\"target\":\"/_next/static/<*>\",\"status\":\"200\"},{\"source\":\"/_next/data/<*>\",\"target\":\"/_next/data/<*>\",\"status\":\"200\"},{\"source\":\"/api/<*>\",\"target\":\"/api/<*>\",\"status\":\"200\"},{\"source\":\"/<*>\",\"target\":\"/index.html\",\"status\":\"200\"}]" \
+    --region "$REGION"
   
-  # Amplify 호스팅 추가
-  if ! amplify status | grep hosting &> /dev/null; then
-    print_warning "Amplify 호스팅이 설정되지 않았습니다. 호스팅 추가 중..."
-    echo '{"hosting":{"S3AndCloudFront":{"service":"S3AndCloudFront","providerPlugin":"awscloudformation"}}}' > ./amplify-hosting.json
-    amplify add hosting --app ./amplify-hosting.json
-  fi
+  print_success "라우팅 규칙이 설정되었습니다."
   
-  # S3 버킷 ACL 설정 확인
-  S3_BUCKET="elasticbeanstalk-$REGION-$(aws sts get-caller-identity --query "Account" --output text)"
-  print_warning "S3 버킷 ACL 설정 확인 중: $S3_BUCKET"
+  # 수동 배포를 위한 안내
+  print_warning "AWS Amplify 콘솔에서 다음 단계를 수행하세요:"
+  echo "1. AWS Amplify 콘솔에 접속: https://ap-northeast-2.console.aws.amazon.com/amplify/home?region=ap-northeast-2#/$AMPLIFY_APP_ID"
+  echo "2. 'Hosting environments' 탭으로 이동"
+  echo "3. 'main' 브랜치 선택"
+  echo "4. 'Deploy without Git provider' 선택"
+  echo "5. 'Choose files' 버튼을 클릭하고 '$ZIP_FILE' 파일 업로드"
+  echo "6. 'Save and deploy' 버튼 클릭"
   
-  # S3 버킷 소유권 설정 확인
-  BUCKET_OWNERSHIP=$(aws s3api get-bucket-ownership-controls --bucket "$S3_BUCKET" 2>/dev/null || echo '{"OwnershipControls":{"Rules":[{"ObjectOwnership":"BucketOwnerEnforced"}]}}')
-  OBJECT_OWNERSHIP=$(echo $BUCKET_OWNERSHIP | grep -o '"ObjectOwnership":"[^"]*"' | cut -d '"' -f 4)
-  
-  if [ "$OBJECT_OWNERSHIP" == "BucketOwnerEnforced" ]; then
-    print_warning "S3 버킷이 ACL을 비활성화했습니다. ACL을 활성화하는 중..."
-    aws s3api put-bucket-ownership-controls \
-      --bucket "$S3_BUCKET" \
-      --ownership-controls="Rules=[{ObjectOwnership=BucketOwnerPreferred}]"
-    print_success "S3 버킷 ACL이 활성화되었습니다."
-  else
-    print_success "S3 버킷 ACL이 이미 활성화되어 있습니다."
-  fi
-  
-  # 배포
-  print_warning "프론트엔드 배포 중..."
-  amplify publish --yes
-  
-  # 배포 URL 가져오기
-  FRONTEND_URL=$(amplify status | grep -A 1 "Hosting" | tail -n 1 | awk '{print $3}')
-  print_success "프론트엔드가 성공적으로 배포되었습니다: $FRONTEND_URL"
+  # 배포 URL 저장
+  FRONTEND_URL="https://main.$(aws amplify get-app --app-id "$AMPLIFY_APP_ID" --region "$REGION" --query "app.defaultDomain" --output text)"
+  echo "$FRONTEND_URL" > "$PROJECT_ROOT/.frontend_url"
+  print_success "배포가 완료되면 다음 URL로 접속할 수 있습니다: $FRONTEND_URL"
   
   cd "$PROJECT_ROOT"
 }
@@ -245,7 +309,12 @@ main() {
   
   print_header "배포가 완료되었습니다!"
   echo "백엔드 URL: $(cat "$PROJECT_ROOT/.backend_url")"
-  echo "프론트엔드 URL: $(amplify status | grep -A 1 "Hosting" | tail -n 1 | awk '{print $3}')"
+  
+  if [ -f "$PROJECT_ROOT/.frontend_url" ]; then
+    echo "프론트엔드 URL: $(cat "$PROJECT_ROOT/.frontend_url")"
+  else
+    echo "프론트엔드 URL: 배포 정보를 찾을 수 없습니다."
+  fi
 }
 
 # 스크립트 실행

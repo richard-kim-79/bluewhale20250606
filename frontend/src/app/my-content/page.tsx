@@ -50,25 +50,16 @@ export default function MyContentPage() {
       setError(null);
       
       // Use the API service to fetch user content with pagination
-      const response = await contentAPI.getUserContent(undefined, { 
-        page, 
-        limit 
-      });
-      
-      // Safely handle the response
-      if (response && response.data) {
-        if (page === 1) {
-          setUserContent(response.data);
-        } else {
-          setUserContent(prev => [...prev, ...response.data]);
-        }
-        
-        // Check if there might be more content to load
-        setHasMore(response.data.length === limit);
+      const response = await contentAPI.getMyContent();
+      // response가 배열 또는 객체 형태 모두 대응
+      let contentArr = Array.isArray(response) ? response : (response.data || response.content || []);
+      if (!Array.isArray(contentArr)) contentArr = [];
+      if (page === 1) {
+        setUserContent(contentArr);
       } else {
-        setUserContent([]);
-        setHasMore(false);
+        setUserContent(prev => [...prev, ...contentArr]);
       }
+      setHasMore(contentArr.length === limit);
     } catch (error) {
       console.error('Error fetching user content:', error);
       setError('콘텐츠를 불러오는데 실패했습니다. 다시 시도해주세요.');

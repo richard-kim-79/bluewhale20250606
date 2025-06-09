@@ -109,31 +109,51 @@ export default function CreateContent() {
     setError('');
     
     try {
+      console.log('Creating content with data:', data);
+      console.log('Selected file:', selectedFile);
+      
       const formData = new FormData();
       formData.append('title', data.title);
       formData.append('contentType', data.contentType);
       
       if (data.contentType === 'text' && data.textContent) {
         formData.append('textContent', data.textContent);
+        console.log('Added text content to form data');
       } else if (data.contentType === 'pdf' && selectedFile) {
-        formData.append('file', selectedFile);
+        // 파일명에 특수문자가 있으면 서버에서 처리하기 어려울 수 있으므로 간단한 이름으로 변경
+        const fileExtension = selectedFile.name.split('.').pop() || 'pdf';
+        const simpleFileName = `document-${Date.now()}.${fileExtension}`;
+        
+        // 새 파일 객체 생성 (이름 변경)
+        const renamedFile = new File([selectedFile], simpleFileName, { type: selectedFile.type });
+        formData.append('file', renamedFile);
+        console.log('Added file to form data:', { originalName: selectedFile.name, newName: simpleFileName, type: selectedFile.type, size: selectedFile.size });
       }
       
       if (allowLocation && location) {
         formData.append('latitude', location.lat.toString());
         formData.append('longitude', location.lng.toString());
+        console.log('Added location to form data:', location);
       }
       
+      console.log('Sending form data to API');
       const response = await contentAPI.createContent(formData);
+      console.log('API response:', response);
       
       // Redirect to the newly created content page
-      if (response && response.data && response.data.id) {
+      if (response && response.content && response.content._id) {
+        console.log('Content created successfully, redirecting to content page');
+        router.push(`/content/${response.content._id}`);
+      } else if (response && response.data && response.data.id) {
+        console.log('Content created successfully (legacy response), redirecting to content page');
         router.push(`/content/${response.data.id}`);
       } else {
+        console.log('Content created but no ID returned, redirecting to profile page');
         router.push('/profile'); // Fallback to profile page if no ID returned
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || '콘텐츠 업로드에 실패했습니다.');
+      console.error('Content creation error:', err);
+      setError(err.response?.data?.message || err.message || '콘텐츠 업로드에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }

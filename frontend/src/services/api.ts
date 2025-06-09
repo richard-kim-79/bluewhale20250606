@@ -91,6 +91,16 @@ export const authAPI = {
 
 // Content API
 export const contentAPI = {
+  // 내 콘텐츠 조회
+  getMyContent: async () => {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch('/api/content/personalized', {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+    });
+    return response.json();
+  },
   // Get all content with optional filters
   getContent: async (params?: {
     page?: number;
@@ -133,18 +143,45 @@ export const contentAPI = {
   
   // Get content by ID
   getContentById: async (id: string) => {
-    const response = await apiClient.get(`/content/${id}`);
-    return response.data;
+    // 내부 API 라우트 사용 (CORS 우회)
+    const token = localStorage.getItem('authToken');
+    
+    const response = await fetch(`/api/content/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+    });
+    
+    return response.json();
   },
   
   // Create new content
   createContent: async (data: FormData) => {
-    const response = await apiClient.post('/content', data, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // 내부 API 라우트 사용 (CORS 우회)
+    const token = localStorage.getItem('authToken');
+    
+    // 디버깅을 위한 FormData 내용 출력
+    console.log('FormData entries:');
+    // Array.from을 사용하여 반복 처리
+    Array.from(data.entries()).forEach(([key, value]) => {
+      if (value instanceof File) {
+        console.log(`${key}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
+      } else {
+        console.log(`${key}: ${value}`);
+      }
     });
-    return response.data;
+    
+    const response = await fetch('/api/content/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: data, // FormData는 자동으로 multipart/form-data로 설정됨
+    });
+    
+    return response.json();
   },
   
   // Update content
