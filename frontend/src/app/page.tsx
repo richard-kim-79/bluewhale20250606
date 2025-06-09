@@ -23,20 +23,21 @@ export default function Home() {
       
       <div className="max-w-4xl mx-auto px-4 py-6">
         {!isAuthenticated && !loading ? (
-          <div className="text-center py-12">
-            <h1 className="text-4xl font-bold text-blue-whale-700 mb-6">
-              블루웨일 프로토콜에 오신 것을 환영합니다
-            </h1>
-            <p className="text-xl mb-8 text-gray-600">
-              지역 기반의 실시간 지식과 AI가 검증한 글로벌 인사이트를 연결하는 탈중앙화 프로토콜
-            </p>
-            <div className="flex justify-center space-x-4">
-              <Link href="/login" className="btn-primary">
-                로그인
-              </Link>
-              <Link href="/register" className="btn-secondary">
-                회원가입
-              </Link>
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border-t-4 border-blue-whale-600">
+              <div className="mb-8">
+                <p className="text-2xl font-semibold text-blue-whale-800 mb-4">
+                  당신의 글과 문서로 가장 잘 어울리는 사람들과 연결합니다.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <Link href="/login" className="btn-primary px-8 py-3 text-lg">
+                  로그인
+                </Link>
+                <Link href="/register" className="btn-secondary px-8 py-3 text-lg">
+                  회원가입
+                </Link>
+              </div>
             </div>
           </div>
         ) : (
