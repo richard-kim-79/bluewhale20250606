@@ -45,23 +45,47 @@ apiClient.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: async (email: string, password: string) => {
-    const response = await apiClient.post('/auth/login', { email, password });
-    return response.data;
+    // 내부 API 라우트 사용 (CORS 우회)
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    return response.json();
   },
   
   register: async (email: string, password: string) => {
-    const response = await apiClient.post('/auth/register', { email, password });
-    return response.data;
+    // 내부 API 라우트 사용 (CORS 우회)
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    return response.json();
   },
   
   getCurrentUser: async () => {
-    const response = await apiClient.get('/auth/me');
-    return response.data;
+    // 내부 API 라우트 사용 (CORS 우회)
+    const token = localStorage.getItem('authToken');
+    const response = await fetch('/api/auth/me', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+    });
+    return response.json();
   },
   
   logout: async () => {
-    const response = await apiClient.post('/auth/logout');
-    return response.data;
+    // 로그아웃은 클라이언트에서 처리
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    return { success: true };
   },
 };
 
