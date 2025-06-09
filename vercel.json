@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
+  "framework": "nextjs",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/frontend/$1" }
+  ],
+  "env": {
+    "NEXT_PUBLIC_API_URL": "http://bluewhale-backend-env.eba-wehmnn34.ap-northeast-2.elasticbeanstalk.com"
+  }
+}
