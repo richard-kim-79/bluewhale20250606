@@ -1,29 +1,62 @@
+import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 
-// 더미 통계 데이터
-const stats = [
-  { label: "총 구독자", value: "1,240", change: "+12%", trend: "up" },
-  { label: "유료 구독자", value: "89", change: "+5%", trend: "up" },
-  { label: "이번 달 수익", value: "881,100원", change: "+8%", trend: "up" },
-  { label: "총 발행 글", value: "47", change: "+2", trend: "up" },
-];
+export default async function DashboardPage() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-const recentPosts = [
-  { id: "1", title: "2026년 AI 트렌드 총정리", status: "published", views: 342, published_at: "2026-03-01" },
-  { id: "2", title: "GPT-5가 바꿀 개발자의 미래", status: "published", views: 289, published_at: "2026-02-25" },
-  { id: "3", title: "클라우드 네이티브 아키텍처 입문", status: "draft", views: 0, published_at: null },
-];
+  // 내 뉴스레터 가져오기
+  const { data: newsletters } = await supabase
+    .from("newsletters")
+    .select("id")
+    .eq("writer_id", user.id);
 
-const recentSubscribers = [
-  { name: "홍길동", email: "hong@example.com", is_paid: true, subscribed_at: "2026-03-01" },
-  { name: "김철수", email: "kim@example.com", is_paid: false, subscribed_at: "2026-02-28" },
-  { name: "이영희", email: "lee@example.com", is_paid: true, subscribed_at: "2026-02-27" },
-  { name: "박민수", email: "park@example.com", is_paid: false, subscribed_at: "2026-02-26" },
-];
+  const newsletterIds = newsletters?.map((n) => n.id) ?? [];
 
-export default function DashboardPage() {
+  // 통계 데이터
+  const { count: subscriberCount } = await supabase
+    .from("subscriptions")
+    .select("*", { count: "exact", head: true })
+    .in("newsletter_id", newsletterIds.length > 0 ? newsletterIds : ["__none__"])
+    .eq("status", "active");
+
+  const { count: paidSubscriberCount } = await supabase
+    .from("subscriptions")
+    .select("*", { count: "exact", head: true })
+    .in("newsletter_id", newsletterIds.length > 0 ? newsletterIds : ["__none__"])
+    .eq("status", "active")
+    .eq("is_paid", true);
+
+  const { data: posts } = await supabase
+    .from("posts")
+    .select("id, title, is_published, published_at, created_at")
+    .eq("writer_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const { data: recentSubsData } = await supabase
+    .from("subscriptions")
+    .select("id, is_paid, created_at, subscriber:profiles!subscriber_id(name, email)")
+    .in("newsletter_id", newsletterIds.length > 0 ? newsletterIds : ["__none__"])
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const recentSubs = (recentSubsData ?? []) as unknown as {
+    id: string; is_paid: boolean; created_at: string;
+    subscriber: { name: string; email: string } | null;
+  }[];
+
+  const stats = [
+    { label: "총 구독자", value: (subscriberCount ?? 0).toLocaleString() + "명" },
+    { label: "유료 구독자", value: (paidSubscriberCount ?? 0).toLocaleString() + "명" },
+    { label: "총 발행 글", value: (posts?.filter((p) => p.is_published).length ?? 0).toString() + "개" },
+    { label: "초안", value: (posts?.filter((p) => !p.is_published).length ?? 0).toString() + "개" },
+  ];
+
   return (
     <div>
       <div className="mb-8">
@@ -31,76 +64,79 @@ export default function DashboardPage() {
         <p className="text-sm text-gray-500 mt-1">뉴스레터 성과를 한눈에 확인하세요</p>
       </div>
 
-      {/* 통계 카드 */}
+      {newsletterIds.length === 0 && (
+        <Card className="mb-8 border-primary-200 bg-primary-50">
+          <div className="text-center py-4">
+            <p className="text-primary-800 font-medium mb-2">아직 뉴스레터가 없습니다</p>
+            <p className="text-sm text-primary-600 mb-4">설정 페이지에서 뉴스레터를 만들어보세요</p>
+            <Link href="/dashboard/settings" className="text-sm text-primary-700 underline font-medium">
+              뉴스레터 만들기 &rarr;
+            </Link>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
             <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-            <p className="text-xs text-green-600 mt-1">
-              <span className="inline-flex items-center">
-                <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-                {stat.change} 지난 달 대비
-              </span>
-            </p>
           </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 최근 글 */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">최근 글</h2>
-            <Link href="/dashboard/posts" className="text-sm text-primary-600 hover:text-primary-700">
-              전체 보기
-            </Link>
+            <Link href="/dashboard/posts" className="text-sm text-primary-600 hover:text-primary-700">전체 보기</Link>
           </div>
-          <div className="space-y-3">
-            {recentPosts.map((post) => (
-              <div key={post.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div className="flex-1 min-w-0">
-                  <Link href={`/dashboard/posts/${post.id}/edit`} className="text-sm font-medium text-gray-900 hover:text-primary-600 truncate block">
-                    {post.title}
-                  </Link>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {post.published_at || "초안"} {post.views > 0 && `· 조회 ${post.views}`}
-                  </p>
+          {posts && posts.length > 0 ? (
+            <div className="space-y-3">
+              {posts.map((post) => (
+                <div key={post.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/dashboard/posts/${post.id}/edit`} className="text-sm font-medium text-gray-900 hover:text-primary-600 truncate block">
+                      {post.title}
+                    </Link>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {post.published_at ? new Date(post.published_at).toLocaleDateString("ko-KR") : "초안"}
+                    </p>
+                  </div>
+                  <Badge variant={post.is_published ? "success" : "default"}>
+                    {post.is_published ? "발행됨" : "초안"}
+                  </Badge>
                 </div>
-                <Badge variant={post.status === "published" ? "success" : "default"}>
-                  {post.status === "published" ? "발행됨" : "초안"}
-                </Badge>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 py-4 text-center">아직 작성한 글이 없습니다</p>
+          )}
         </Card>
 
-        {/* 최근 구독자 */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">최근 구독자</h2>
-            <Link href="/dashboard/subscribers" className="text-sm text-primary-600 hover:text-primary-700">
-              전체 보기
-            </Link>
+            <Link href="/dashboard/subscribers" className="text-sm text-primary-600 hover:text-primary-700">전체 보기</Link>
           </div>
-          <div className="space-y-3">
-            {recentSubscribers.map((sub) => (
-              <div key={sub.email} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{sub.name}</p>
-                  <p className="text-xs text-gray-400">{sub.email}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={sub.is_paid ? "info" : "default"}>
-                    {sub.is_paid ? "유료" : "무료"}
-                  </Badge>
-                  <span className="text-xs text-gray-400">{sub.subscribed_at}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {recentSubs && recentSubs.length > 0 ? (
+            <div className="space-y-3">
+              {recentSubs.map((sub) => (
+                  <div key={sub.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{sub.subscriber?.name ?? "알 수 없음"}</p>
+                      <p className="text-xs text-gray-400">{sub.subscriber?.email ?? ""}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={sub.is_paid ? "info" : "default"}>{sub.is_paid ? "유료" : "무료"}</Badge>
+                      <span className="text-xs text-gray-400">{new Date(sub.created_at).toLocaleDateString("ko-KR")}</span>
+                    </div>
+                  </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 py-4 text-center">아직 구독자가 없습니다</p>
+          )}
         </Card>
       </div>
     </div>

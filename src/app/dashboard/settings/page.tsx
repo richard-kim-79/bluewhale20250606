@@ -1,17 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newsletterId, setNewsletterId] = useState<string | null>(null);
   const [newsletter, setNewsletter] = useState({
-    title: "테크 인사이트",
-    description: "매주 IT 업계의 핵심 뉴스와 트렌드를 깊이 있게 분석합니다.",
-    is_paid: true,
-    price_monthly: 9900,
+    title: "",
+    description: "",
+    is_paid: false,
+    price_monthly: 0,
   });
+
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+
+      const { data } = await supabase
+        .from("newsletters")
+        .select("id, title, description, is_paid, price_monthly")
+        .eq("writer_id", user.id)
+        .limit(1)
+        .single();
+
+      if (data) {
+        setNewsletterId(data.id);
+        setNewsletter({
+          title: data.title,
+          description: data.description ?? "",
+          is_paid: data.is_paid,
+          price_monthly: data.price_monthly,
+        });
+      }
+      setLoading(false);
+    }
+    load();
+  }, [supabase, router]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    if (newsletterId) {
+      await supabase.from("newsletters").update({
+        title: newsletter.title,
+        description: newsletter.description,
+        is_paid: newsletter.is_paid,
+        price_monthly: newsletter.price_monthly,
+      }).eq("id", newsletterId);
+    } else {
+      const { data } = await supabase.from("newsletters").insert({
+        writer_id: user.id,
+        title: newsletter.title || `${user.email}의 뉴스레터`,
+        description: newsletter.description,
+        is_paid: newsletter.is_paid,
+        price_monthly: newsletter.price_monthly,
+      }).select("id").single();
+      if (data) setNewsletterId(data.id);
+    }
+
+    setSaving(false);
+    router.refresh();
+  };
+
+  if (loading) {
+    return <div className="py-12 text-center text-gray-400">로딩 중...</div>;
+  }
 
   return (
     <div>
@@ -21,7 +85,6 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
-        {/* 기본 정보 */}
         <Card>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">기본 정보</h2>
           <div className="space-y-4">
@@ -39,20 +102,9 @@ export default function SettingsPage() {
                 onChange={(e) => setNewsletter({ ...newsletter, description: e.target.value })}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">커버 이미지</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-sm text-gray-500">이미지를 드래그하거나 클릭하여 업로드</p>
-              </div>
-            </div>
-            <Button>변경 사항 저장</Button>
           </div>
         </Card>
 
-        {/* 유료 구독 설정 */}
         <Card>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">유료 구독 설정</h2>
           <div className="space-y-4">
@@ -67,11 +119,9 @@ export default function SettingsPage() {
                   newsletter.is_paid ? "bg-primary-600" : "bg-gray-200"
                 }`}
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    newsletter.is_paid ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  newsletter.is_paid ? "translate-x-6" : "translate-x-1"
+                }`} />
               </button>
             </div>
             {newsletter.is_paid && (
@@ -79,14 +129,15 @@ export default function SettingsPage() {
                 label="월 구독료 (원)"
                 type="number"
                 value={newsletter.price_monthly.toString()}
-                onChange={(e) =>
-                  setNewsletter({ ...newsletter, price_monthly: parseInt(e.target.value) || 0 })
-                }
+                onChange={(e) => setNewsletter({ ...newsletter, price_monthly: parseInt(e.target.value) || 0 })}
               />
             )}
-            <Button>결제 설정 저장</Button>
           </div>
         </Card>
+
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? "저장 중..." : "변경 사항 저장"}
+        </Button>
       </div>
     </div>
   );

@@ -62,33 +62,70 @@ export interface Payment {
   paid_at: string | null;
 }
 
-// Supabase Database type (simplified)
+// Supabase Database type
 export interface Database {
   public: {
     Tables: {
       profiles: {
         Row: Profile;
-        Insert: Omit<Profile, "created_at">;
+        Insert: {
+          id: string;
+          email: string;
+          name: string;
+          bio?: string | null;
+          avatar_url?: string | null;
+          is_writer?: boolean;
+        };
         Update: Partial<Omit<Profile, "id" | "created_at">>;
       };
       newsletters: {
         Row: Newsletter;
-        Insert: Omit<Newsletter, "id" | "created_at">;
-        Update: Partial<Omit<Newsletter, "id" | "created_at">>;
+        Insert: {
+          writer_id: string;
+          title: string;
+          description?: string | null;
+          cover_image_url?: string | null;
+          is_paid?: boolean;
+          price_monthly?: number;
+        };
+        Update: Partial<Omit<Newsletter, "id" | "writer_id" | "created_at">>;
       };
       posts: {
         Row: Post;
-        Insert: Omit<Post, "id" | "created_at">;
-        Update: Partial<Omit<Post, "id" | "created_at">>;
+        Insert: {
+          newsletter_id: string;
+          writer_id: string;
+          title: string;
+          content?: string;
+          excerpt?: string | null;
+          is_premium?: boolean;
+          is_published?: boolean;
+          published_at?: string | null;
+        };
+        Update: Partial<Omit<Post, "id" | "newsletter_id" | "writer_id" | "created_at">>;
       };
       subscriptions: {
         Row: Subscription;
-        Insert: Omit<Subscription, "id" | "created_at">;
+        Insert: {
+          subscriber_id: string;
+          newsletter_id: string;
+          is_paid?: boolean;
+          status?: string;
+          expires_at?: string | null;
+        };
         Update: Partial<Omit<Subscription, "id" | "created_at">>;
       };
       payments: {
         Row: Payment;
-        Insert: Omit<Payment, "id">;
+        Insert: {
+          subscription_id?: string;
+          subscriber_id: string;
+          amount: number;
+          payment_key?: string | null;
+          order_id: string;
+          status?: string;
+          paid_at?: string | null;
+        };
         Update: Partial<Omit<Payment, "id">>;
       };
     };

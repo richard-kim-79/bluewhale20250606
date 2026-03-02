@@ -1,25 +1,56 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isWriter, setIsWriter] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // TODO: Supabase Auth 연동
-    await new Promise((r) => setTimeout(r, 500));
-    setLoading(false);
-    alert("회원가입 기능은 Supabase 연동 후 활성화됩니다.");
+    setError("");
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, is_writer: isWriter },
+      },
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    // 작가라면 기본 뉴스레터도 자동 생성
+    if (isWriter) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("newsletters").insert({
+          writer_id: user.id,
+          title: `${name}의 뉴스레터`,
+          description: "",
+        });
+      }
+    }
+
+    router.push("/dashboard");
+    router.refresh();
   };
 
   return (
@@ -32,6 +63,9 @@ export default function RegisterPage() {
 
         <Card>
           <form onSubmit={handleRegister} className="space-y-4">
+            {error && (
+              <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg">{error}</div>
+            )}
             <Input
               id="name"
               label="이름"
@@ -60,7 +94,6 @@ export default function RegisterPage() {
               minLength={8}
             />
 
-            {/* 작가 여부 */}
             <div className="flex items-center gap-3 py-2">
               <button
                 type="button"
