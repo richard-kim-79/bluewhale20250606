@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '../contexts/AuthContext';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import BottomNavigation from '../components/BottomNavigation';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -18,10 +19,12 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`${inter.className} pb-16`}>
-        <AuthProvider>
-          {children}
-          <BottomNavigation />
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            {children}
+            <BottomNavigation />
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

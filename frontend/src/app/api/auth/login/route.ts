@@ -5,7 +5,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password } = body;
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://bluewhale-backend-env.eba-wehmnn34.ap-northeast-2.elasticbeanstalk.com';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
     const response = await fetch(`${apiUrl}/auth/login`, {
       method: 'POST',

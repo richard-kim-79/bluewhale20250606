@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const id = params.id;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://bluewhale-backend-env.eba-wehmnn34.ap-northeast-2.elasticbeanstalk.com';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
     // 쿠키에서 토큰 가져오기
     const cookieStore = cookies();

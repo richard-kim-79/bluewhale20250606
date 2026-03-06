@@ -213,10 +213,7 @@ exports.getPersonalizedContent = async (req, res) => {
 // 콘텐츠 검색
 exports.searchContent = async (req, res) => {
   try {
-    console.log('Search API called with query params:', req.query);
-    console.log('Request URL:', req.originalUrl);
-    
-    const { 
+    const {
       query, 
       page = 1, 
       limit = 10,
@@ -229,9 +226,6 @@ exports.searchContent = async (req, res) => {
       radius = 10 // 기본 반경 10km
     } = req.query;
     const skip = (page - 1) * limit;
-    
-    console.log(`Query: ${query}, Page: ${page}, Limit: ${limit}, Tags: ${tags}, ContentType: ${contentType}, Sort: ${sort}`);
-    console.log(`Location params - Lat: ${lat}, Lon: ${lon}, Lng: ${lng}, Radius: ${radius}km`);
     
     if (!query) {
       return res.status(400).json({ message: '검색어가 필요합니다' });
@@ -260,10 +254,9 @@ exports.searchContent = async (req, res) => {
           pipeline.push({
             $match: { tags: { $in: tagArray } }
           });
-          console.log('Tag filter applied:', tagArray);
         }
       } catch (err) {
-        console.error('Tag filtering error:', err);
+        // Invalid tag format, skip filter
       }
     }
     
@@ -275,10 +268,9 @@ exports.searchContent = async (req, res) => {
           pipeline.push({
             $match: { contentType: { $in: contentTypeArray } }
           });
-          console.log('Content type filter applied:', contentTypeArray);
         }
       } catch (err) {
-        console.error('Content type filtering error:', err);
+        // Invalid content type format, skip filter
       }
     }
     
@@ -288,8 +280,6 @@ exports.searchContent = async (req, res) => {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lon || lng); // lon 또는 lng 사용
         const radiusValue = parseInt(radius) || 10;
-        
-        console.log(`Processing location filter - Parsed values: Lat: ${latitude}, Lon: ${longitude}, Radius: ${radiusValue}km`);
         
         if (!isNaN(latitude) && !isNaN(longitude)) {
           // $near 대신 $geoWithin과 $centerSphere 사용
@@ -309,12 +299,9 @@ exports.searchContent = async (req, res) => {
               }
             }
           });
-          console.log(`Location filter applied using $geoWithin: [${longitude}, ${latitude}], radius: ${radiusValue}km (${radiusInRadians} radians)`);
-        } else {
-          console.log('Invalid location coordinates, skipping location filter');
         }
       } catch (err) {
-        console.error('Location filtering error:', err);
+        // Invalid location format, skip filter
       }
     }
     
@@ -353,8 +340,6 @@ exports.searchContent = async (req, res) => {
     // 9. 페이지네이션 적용
     pipeline.push({ $skip: skip });
     pipeline.push({ $limit: parseInt(limit) });
-    
-    console.log('Aggregation pipeline:', JSON.stringify(pipeline));
     
     // 10. 집계 파이프라인 실행
     const content = await Content.aggregate(pipeline);
@@ -416,11 +401,8 @@ exports.createContent = async (req, res) => {
         contentData.tags = JSON.parse(req.body.tags);
       } catch (e) {
         // 태그 파싱 실패 시 무시
-        console.log('Tags parsing failed:', e);
       }
     }
-    
-    console.log('Creating content with data:', contentData);
     
     // 새 콘텐츠 생성
     const newContent = new Content(contentData);

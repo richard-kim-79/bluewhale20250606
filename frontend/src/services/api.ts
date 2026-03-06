@@ -6,6 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000, // 15초 타임아웃
   headers: {
     'Content-Type': 'application/json',
   },
@@ -161,17 +162,6 @@ export const contentAPI = {
   createContent: async (data: FormData) => {
     // 내부 API 라우트 사용 (CORS 우회)
     const token = localStorage.getItem('authToken');
-    
-    // 디버깅을 위한 FormData 내용 출력
-    console.log('FormData entries:');
-    // Array.from을 사용하여 반복 처리
-    Array.from(data.entries()).forEach(([key, value]) => {
-      if (value instanceof File) {
-        console.log(`${key}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
-      } else {
-        console.log(`${key}: ${value}`);
-      }
-    });
     
     const response = await fetch('/api/content/upload', {
       method: 'POST',

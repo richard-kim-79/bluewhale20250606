@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    minlength: 6
+    minlength: 8
   },
   name: {
     type: String,
@@ -84,30 +84,12 @@ userSchema.pre('save', async function(next) {
 // 비밀번호 검증 메소드
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
-    // 비밀번호 비교 전 로그 추가
-    console.log(`비밀번호 검증 시도 - 입력값 길이: ${candidatePassword?.length || 0}`);
-    console.log(`저장된 해시 길이: ${this.password?.length || 0}`);
-    
-    // 비밀번호가 없거나 해시가 없는 경우 처리
     if (!candidatePassword || !this.password) {
-      console.log('비밀번호 또는 해시가 없음');
       return false;
     }
-    
-    // 테스트 계정을 위한 특별 처리 (개발 환경에서만 사용)
-    if (process.env.NODE_ENV !== 'production' && 
-        candidatePassword === 'password123' && 
-        this.email === 'test@example.com') {
-      console.log('테스트 계정 자동 인증');
-      return true;
-    }
-    
-    // 일반 비밀번호 검증
-    const result = await bcrypt.compare(candidatePassword, this.password);
-    console.log(`비밀번호 검증 결과: ${result}`);
-    return result;
+
+    return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    console.error('비밀번호 검증 오류:', error);
     return false;
   }
 };

@@ -48,40 +48,26 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    console.log(`로그인 시도: ${email}`);
-    
     // 이메일로 사용자 찾기
     const user = await User.findOne({ email });
-    
+
     if (!user) {
-      console.log(`사용자 없음: ${email}`);
       return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다' });
     }
-    
-    console.log(`사용자 찾음: ${user._id}`);
-    
+
     // 비밀번호 확인
-    try {
-      const isPasswordValid = await user.comparePassword(password);
-      
-      console.log(`비밀번호 검증 결과: ${isPasswordValid}`);
-      
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다' });
-      }
-    } catch (pwError) {
-      console.error('비밀번호 검증 오류:', pwError);
+    const isPasswordValid = await user.comparePassword(password);
+
+    if (!isPasswordValid) {
       return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다' });
     }
     
     // JWT 토큰 생성
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'bluewhale-secret-key', // 기본값 제공
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    
-    console.log(`로그인 성공: ${user._id}`);
     
     res.status(200).json({
       message: '로그인 성공',

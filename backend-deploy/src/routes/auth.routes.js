@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const authMiddleware = require('../middleware/auth.middleware');
+const { validateRegister, validateLogin } = require('../middleware/validate.middleware');
 
 // 회원가입
-router.post('/register', authController.register);
+router.post('/register', validateRegister, authController.register);
 
 // 로그인
-router.post('/login', authController.login);
+router.post('/login', validateLogin, authController.login);
 
 // 로그아웃
 router.post('/logout', authMiddleware.verifyToken, authController.logout);

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://bluewhale-backend-env.eba-wehmnn34.ap-northeast-2.elasticbeanstalk.com';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
     // 쿠키에서 토큰 가져오기
     const cookieStore = cookies();
@@ -23,12 +23,6 @@ export async function POST(request: NextRequest) {
     
     // FormData 추출
     const formData = await request.formData();
-    console.log('FormData received:', Array.from(formData.entries()).map(([key, value]) => {
-      if (value instanceof File) {
-        return [key, { name: value.name, type: value.type, size: value.size }];
-      }
-      return [key, value];
-    }));
     
     // 백엔드 API로 요청 전달
     const response = await fetch(`${apiUrl}/content`, {
@@ -41,7 +35,6 @@ export async function POST(request: NextRequest) {
     });
     
     const data = await response.json();
-    console.log('Backend response:', data);
     
     if (!response.ok) {
       return NextResponse.json(
